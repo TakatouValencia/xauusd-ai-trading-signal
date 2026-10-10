@@ -84,6 +84,7 @@ def notify_signal_entry(signal) -> bool:
     payload = {
         "username": "XAUUSD Institutional Sniper",
         "avatar_url": "https://i.imgur.com/4M34hi2.png",
+        "content": config.DISCORD_PING_MENTION,
         "embeds": [embed]
     }
 

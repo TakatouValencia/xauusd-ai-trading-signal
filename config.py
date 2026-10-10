@@ -10,6 +10,7 @@ load_dotenv()
 # 1. DISCORD WEBHOOK CONFIGURATION
 # ==============================================================================
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+DISCORD_PING_MENTION = os.getenv("DISCORD_PING_MENTION", "@everyone").strip()
 
 # ==============================================================================
 # 2. INSTRUMENT & SYMBOL
