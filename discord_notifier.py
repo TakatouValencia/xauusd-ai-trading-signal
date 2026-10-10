@@ -45,8 +45,8 @@ def notify_signal_entry(signal) -> bool:
     reasons_formatted = "\n".join([f"• {r}" for r in signal.reasons])
 
     embed = {
-        "title": f"{icon} XAUUSD 5-PILLAR SNIPER SIGNAL | {action_text}",
-        "description": f"**SMC & 5-Pillar AI Engine** memvalidasi setup akurasi tinggi di **{signal.session}**.",
+        "title": f"{icon} {config.BOT_NAME} | {action_text}",
+        "description": f"**{config.BOT_NAME} 5-Pillar Engine** memvalidasi setup akurasi tinggi di **{signal.session}**.",
         "color": color,
         "fields": [
             {
@@ -76,13 +76,13 @@ def notify_signal_entry(signal) -> bool:
             }
         ],
         "footer": {
-            "text": f"Antigravity XAUUSD 5-Pillar AI Engine • {signal.timestamp}"
+            "text": f"{config.BOT_NAME} • {signal.timestamp}"
         },
         "timestamp": datetime.utcnow().isoformat()
     }
 
     payload = {
-        "username": "XAUUSD Institutional Sniper",
+        "username": config.BOT_NAME,
         "avatar_url": "https://i.imgur.com/4M34hi2.png",
         "content": config.DISCORD_PING_MENTION,
         "embeds": [embed]
@@ -96,23 +96,23 @@ def notify_trade_update(update_type: str, trade_info: dict) -> bool:
     """
     if update_type == "BREAKEVEN":
         color = 2718207 # Blue
-        title = "🛡️ TRADE UPDATE: STOP LOSS MOVED TO BREAKEVEN"
+        title = f"🛡️ {config.BOT_NAME}: STOP LOSS MOVED TO BREAKEVEN"
         desc = f"**{trade_info['direction']} {config.DISPLAY_SYMBOL}** sudah running **+{config.BREAKEVEN_TRIGGER_PIPS} pips**! Stop Loss telah diamankan ke Entry (Risk-Free Trade)."
     elif update_type == "TP1_HIT":
         color = 16766720 # Gold
-        title = "💰 TARGET HIT: TAKE PROFIT 1 (+100 PIPS) REACHED!"
+        title = f"💰 {config.BOT_NAME}: TAKE PROFIT 1 (+100 PIPS) REACHED!"
         desc = f"Selamat! **{trade_info['direction']} {config.DISPLAY_SYMBOL}** mencapai TP1 di `{trade_info['tp1']:.2f}` (**+{config.TP1_PIPS} pips**).\nAmankan 50% partial profit dan biarkan runner melaju ke TP2."
     elif update_type == "TP2_HIT":
         color = 58879 # Cyan
-        title = "🚀 FULL VICTORY: TAKE PROFIT 2 (+150 PIPS) SMASHED!"
+        title = f"🚀 {config.BOT_NAME}: TAKE PROFIT 2 (+150 PIPS) SMASHED!"
         desc = f"Target penuh berhasil tercapai di `{trade_info['tp2']:.2f}`! Total profit terkunci: **+{config.TP2_PIPS} pips**."
     elif update_type == "SL_HIT":
         color = 12000284 # Dark Red
-        title = "🛑 TRADE CLOSED: STOP LOSS HIT"
+        title = f"🛑 {config.BOT_NAME}: STOP LOSS HIT"
         desc = f"Trade **{trade_info['direction']} {config.DISPLAY_SYMBOL}** terkena Stop Loss di `{trade_info['sl']:.2f}` (`-{trade_info['sl_pips']} pips`). Disiplin risiko terjaga."
     else:
         color = 9807270
-        title = f"ℹ️ TRADE UPDATE: {update_type}"
+        title = f"ℹ️ {config.BOT_NAME}: {update_type}"
         desc = json.dumps(trade_info)
 
     embed = {
@@ -120,12 +120,12 @@ def notify_trade_update(update_type: str, trade_info: dict) -> bool:
         "description": desc,
         "color": color,
         "footer": {
-            "text": f"Antigravity XAUUSD 5-Pillar AI Engine • {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            "text": f"{config.BOT_NAME} • {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}"
         }
     }
 
     payload = {
-        "username": "XAUUSD Institutional Sniper",
+        "username": config.BOT_NAME,
         "avatar_url": "https://i.imgur.com/4M34hi2.png",
         "embeds": [embed]
     }

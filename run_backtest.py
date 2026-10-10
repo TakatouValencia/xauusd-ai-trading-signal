@@ -174,7 +174,7 @@ def execute_backtest(df_15m: pd.DataFrame,
 
 def print_backtest_report(df_trades: pd.DataFrame):
     print("\n" + "="*80)
-    print("      🏆 XAUUSD INSTITUTIONAL SMC + ORDERFLOW AI BACKTEST REPORT 🏆")
+    print(f"      🏆 {config.BOT_NAME} INSTITUTIONAL 5-PILLAR AI BACKTEST REPORT 🏆")
     print("                          (PERIODE 2 BULAN TERAKHIR)")
     print("="*80)
 

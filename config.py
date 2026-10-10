@@ -13,8 +13,9 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 DISCORD_PING_MENTION = os.getenv("DISCORD_PING_MENTION", "@everyone").strip()
 
 # ==============================================================================
-# 2. INSTRUMENT & SYMBOL
+# 2. INSTRUMENT & BOT IDENTITY
 # ==============================================================================
+BOT_NAME = "Novaire EA V2"
 SYMBOL = "GC=F"           # Gold Futures (CME Comex Gold)
 DISPLAY_SYMBOL = "XAUUSD" # Tampilan simbol di Discord
 

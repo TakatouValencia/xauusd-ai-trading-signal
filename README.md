@@ -1,6 +1,6 @@
-# 🪙 XAUUSD Institutional 5-Pillar AI Signal Engine (Win Rate 86.96%)
+# 🪙 Novaire EA V2 - XAUUSD Institutional 5-Pillar AI Signal Engine (Win Rate 86.96%)
 
-Sistem AI Signal Generator otomatis berbasis **Smart Money Concepts (SMC)**, **Orderflow Liquidity Sweeps**, dan **5-Pillar Institutional Architecture** khusus instrumen **Gold (XAUUSD)** dengan integrasi notifikasi real-time ke **Discord Webhook**.
+**Novaire EA V2** adalah sistem AI Signal Generator otomatis berbasis **Smart Money Concepts (SMC)**, **Orderflow Liquidity Sweeps**, dan **5-Pillar Institutional Architecture** khusus instrumen **Gold (XAUUSD)** dengan integrasi notifikasi real-time ke **Discord Webhook**.
 
 ---
 

@@ -139,7 +139,7 @@ def test_discord_alert():
 
 def run_live_loop():
     print("=" * 75)
-    print("   🤖 XAUUSD LIVE SMC & ORDERFLOW SIGNAL ENGINE STARTED 🤖")
+    print(f"   🤖 {config.BOT_NAME} (XAUUSD 5-PILLAR AI ENGINE) STARTED 🤖")
     print(f"   Pair: {config.DISPLAY_SYMBOL} | SL: {config.SL_PIPS}p | TP1: {config.TP1_PIPS}p | TP2: {config.TP2_PIPS}p")
     print(f"   Min Score: {config.MIN_CONFLUENCE_SCORE}/100 | Sesi: London & NY Killzone")
     print("=" * 75)
