@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import config
 from data_feed import fetch_latest_live_candles, prepare_multi_timeframe_data
-from strategy_engine import analyze_candle_for_signal, Signal
+from strategy_engine import analyze_candle_for_signal, check_trading_session, Signal
 from discord_notifier import notify_signal_entry, notify_trade_update
 
 if sys.stdout.encoding != 'utf-8':
@@ -187,9 +187,8 @@ def run_live_loop():
                         print(f"\n🔥 [SIGNAL DETECTED] {signal.direction} @ {signal.entry_price:.2f} | Skor: {signal.score}/100", flush=True)
                         notify_signal_entry(signal)
                         tracker.open_trade(signal)
-                    else:
-                        is_kz = (config.LONDON_KZ_START_HOUR <= hour_utc <= config.LONDON_KZ_END_HOUR) or (config.NY_KZ_START_HOUR <= hour_utc <= config.NY_KZ_END_HOUR)
-                        status_str = "Menunggu Killzone" if not is_kz else "Scanning A+ Setups..."
+                        is_kz, session_name = check_trading_session(hour_utc, now_utc.minute)
+                        status_str = f"Scanning A+ Setups di {session_name}" if is_kz else "Menunggu Jam Sesi Killzone (London/NY)"
                         print(f"   Status: {status_str} (Belum ada setup dengan skor >= {config.MIN_CONFLUENCE_SCORE})", flush=True)
 
         except Exception as e:
