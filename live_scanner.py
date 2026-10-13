@@ -140,15 +140,19 @@ def test_discord_alert():
         sl_price=round(current_price - sl_dist, 2),
         tp1_price=round(current_price + tp1_dist, 2),
         tp2_price=round(current_price + tp2_dist, 2),
-        score=88,
+        score=92,
         session="London Killzone",
         reasons=[
-            "1H Higher-Timeframe Trend Bullish (H1 > EMA50)",
-            f"Swept Key Liquidity Level di ${current_price - 5.0:.2f}",
-            "Bullish Rejection Wick (Buyer Absorption > 35%)",
-            "Institutional Volume Spike (1.4x of 20-SMA)",
+            "Pilar 2: Macro Bias Sempurna (Daily & H1 Keduanya Bullish)",
+            "Pilar 3: DXY Mengonfirmasi (Indeks Dollar AS Bearish Rejection)",
+            f"Institutional Fresh Area: Confluence Fresh OB (Demand) + FVG [${current_price - 2.50:.2f} - ${current_price:.2f}]",
+            f"SMC: Swept Key Liquidity Level di ${current_price - 5.00:.2f}",
+            "Orderflow: Rejection Wick Kuat (Buyer Absorption > 35%)",
+            "Volume Footprint Spike (1.4x dari SMA-20)",
             "Healthy RSI Expansion (56.4 - Non Exhausted)"
-        ]
+        ],
+        zone_type="Confluence: Fresh OB (Demand) + FVG",
+        zone_range=f"[${current_price - 2.50:.2f} - ${current_price:.2f}]"
     )
     success = notify_signal_entry(mock_signal)
     if success:

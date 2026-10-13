@@ -166,6 +166,7 @@ def execute_backtest(df_15m: pd.DataFrame,
                     'tp1_hit': False,
                     'score': sig.score,
                     'session': sig.session,
+                    'zone_type': getattr(sig, 'zone_type', 'Fresh Institutional Area'),
                     'reasons': " | ".join(sig.reasons)
                 }
 
@@ -233,6 +234,15 @@ def print_backtest_report(df_trades: pd.DataFrame):
         m_wr = (m_wins / m_trades) * 100
         m_pips = group['pnl_pips'].sum()
         print(f"   • {m:<15} : {m_trades:2} trades | WR: {m_wr:5.1f}% | Total: {m_pips:+7.1f} pips")
+
+    # Institutional Fresh Zone Distribution
+    if 'zone_type' in df_trades.columns:
+        print("-" * 80)
+        print("🏛️ DISTRIBUSI AREA FRESH INSTITUSIONAL (SMC / SND / OB / FVG / SNR):")
+        for z, count in df_trades['zone_type'].value_counts().items():
+            z_wins = len(df_trades[(df_trades['zone_type'] == z) & (df_trades['pnl_pips'] > 0)])
+            z_wr = (z_wins / count) * 100
+            print(f"   • {z:<45} : {count:2} trades | WR: {z_wr:5.1f}%")
 
     print("=" * 80)
     print("\n📝 10 CONTOH TRADE TERBARU:")

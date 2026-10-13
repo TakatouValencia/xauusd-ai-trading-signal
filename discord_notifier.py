@@ -51,22 +51,22 @@ def notify_signal_entry(signal) -> bool:
         "fields": [
             {
                 "name": "📌 Setup Details",
-                "value": f"**Pair:** `{config.DISPLAY_SYMBOL}`\n**Action:** `{signal.direction}`\n**Timeframe:** `M15 (Daily & H1 Bias)`\n**AI Score:** `{signal.score}/100 (Grade A+ Sniper)`",
+                "value": f"**Pair:** `{config.DISPLAY_SYMBOL}`\n**Action:** `{action_text}`\n**Timeframe:** `M15 (Daily & H1 Bias)`\n**AI Score:** `{signal.score}/100 (Grade A+ Sniper)`",
                 "inline": True
             },
             {
                 "name": "🎯 Order Parameters",
-                "value": f"**Entry (FVG):** `{signal.entry_price:.2f}`\n**SL:** `{signal.sl_price:.2f}` (`-{signal.sl_pips} pips`)\n**TP1:** `{signal.tp1_price:.2f}` (`+{signal.tp1_pips} pips`)\n**TP2:** `{signal.tp2_price:.2f}` (`+{signal.tp2_pips} pips`)",
+                "value": f"**Limit Entry:** `{signal.entry_price:.2f}`\n**SL:** `{signal.sl_price:.2f}` (`-{signal.sl_pips} pips`)\n**TP1:** `{signal.tp1_price:.2f}` (`+{signal.tp1_pips} pips`)\n**TP2:** `{signal.tp2_price:.2f}` (`+{signal.tp2_pips} pips`)",
                 "inline": True
             },
             {
-                "name": "⚖️ Risk / Reward",
-                "value": f"**RR to TP1:** `{signal.rr_tp1}`\n**RR to TP2:** `{signal.rr_tp2}`\n**Win Probability:** `> 85%`",
-                "inline": True
+                "name": "🏛️ Fresh Institutional Area (SMC / SND / OB / FVG)",
+                "value": f"**Zone:** `{getattr(signal, 'zone_type', 'Fresh Institutional Area')}`\n**Range:** `{getattr(signal, 'zone_range', '-')}`\n**RR to TP1:** `1:{signal.rr_tp1}` | **TP2:** `1:{signal.rr_tp2}`",
+                "inline": False
             },
             {
-                "name": "🏛️ 5-Pillar Confluences",
-                "value": reasons_formatted if reasons_formatted else "• News Clear | Macro Daily/H1 Aligned | DXY Confirmed | FVG Limit",
+                "name": "⚡ 5-Pillar Confluences",
+                "value": reasons_formatted if reasons_formatted else "• Fresh Institutional Area | Macro Aligned | DXY Confirmed",
                 "inline": False
             },
             {
