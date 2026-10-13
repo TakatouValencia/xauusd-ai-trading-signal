@@ -111,21 +111,34 @@ class LivePositionTracker:
 
 def test_discord_alert():
     """
-    Send an immediate test alert to verify Discord Webhook configuration.
+    Send an immediate test alert using real-time market price to verify Discord Webhook configuration.
     """
-    print("[TEST] Sending test institutional signal to Discord...")
+    print("[TEST] Mengambil harga market real-time XAUUSD...", flush=True)
+    try:
+        df_5m = fetch_latest_live_candles(count=20)
+        current_price = round(float(df_5m['Close'].iloc[-1]), 2)
+        print(f"[TEST] Harga real-time market saat ini terdeteksi: ${current_price:.2f}", flush=True)
+    except Exception as e:
+        print(f"[WARN] Gagal mengambil candle real-time ({e}), menggunakan fallback.", flush=True)
+        current_price = 4212.00
+
+    sl_dist = config.SL_PIPS / 10.0
+    tp1_dist = config.TP1_PIPS / 10.0
+    tp2_dist = config.TP2_PIPS / 10.0
+
+    print(f"[TEST] Mengirim sinyal uji coba dengan harga real-time (${current_price:.2f}) ke Discord...", flush=True)
     mock_signal = Signal(
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         direction="BUY",
-        entry_price=2650.00,
-        sl_price=2644.00,
-        tp1_price=2660.00,
-        tp2_price=2665.00,
+        entry_price=current_price,
+        sl_price=round(current_price - sl_dist, 2),
+        tp1_price=round(current_price + tp1_dist, 2),
+        tp2_price=round(current_price + tp2_dist, 2),
         score=88,
         session="London Killzone",
         reasons=[
             "1H Higher-Timeframe Trend Bullish (H1 > EMA50)",
-            "Swept Asian Range Low (SSL Pool at 2642.50)",
+            f"Swept Key Liquidity Level di ${current_price - 5.0:.2f}",
             "Bullish Rejection Wick (Buyer Absorption > 35%)",
             "Institutional Volume Spike (1.4x of 20-SMA)",
             "Healthy RSI Expansion (56.4 - Non Exhausted)"
@@ -133,7 +146,7 @@ def test_discord_alert():
     )
     success = notify_signal_entry(mock_signal)
     if success:
-        print("✅ [SUCCESS] Sinyal uji coba berhasil dikirim ke Discord!")
+        print(f"✅ [SUCCESS] Sinyal uji coba berhasil dikirim ke Discord pada harga ${current_price:.2f}!")
     else:
         print("⚠️ [NOTE] Webhook URL belum diisi di config.py / .env, atau URL tidak valid.")
 
@@ -159,7 +172,7 @@ def run_live_loop():
                 time.sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
-            df_15m = prepare_multi_timeframe_data(df_5m)
+            df_15m = prepare_multi_timeframe_data(df_5m, is_live=True)
             if df_15m.empty:
                 time.sleep(config.POLL_INTERVAL_SECONDS)
                 continue
@@ -187,6 +200,7 @@ def run_live_loop():
                         print(f"\n🔥 [SIGNAL DETECTED] {signal.direction} @ {signal.entry_price:.2f} | Skor: {signal.score}/100", flush=True)
                         notify_signal_entry(signal)
                         tracker.open_trade(signal)
+                    else:
                         is_kz, session_name = check_trading_session(hour_utc, now_utc.minute)
                         status_str = f"Scanning A+ Setups di {session_name}" if is_kz else "Menunggu Jam Sesi Killzone (London/NY)"
                         print(f"   Status: {status_str} (Belum ada setup dengan skor >= {config.MIN_CONFLUENCE_SCORE})", flush=True)

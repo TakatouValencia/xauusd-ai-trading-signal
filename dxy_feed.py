@@ -29,6 +29,16 @@ def get_dxy_data(period="60d", interval="15m", use_cache=True):
     df['DXY_Bearish'] = (df['Close'] < df['DXY_EMA50']) & (df['DXY_EMA20'] <= df['DXY_EMA50'])
     return df
 
+def get_live_dxy():
+    """
+    Fetch real-time DXY candles (5d) for live scanner.
+    """
+    try:
+        return get_dxy_data(period="5d", interval="15m", use_cache=False)
+    except Exception as e:
+        print(f"[WARN] Live DXY download error: {e}, falling back to cache", flush=True)
+        return get_dxy_data(period="60d", interval="15m", use_cache=True)
+
 if __name__ == "__main__":
     df = get_dxy_data(use_cache=False)
     print(f"DXY cached: {len(df)} candles from {df.index[0]} to {df.index[-1]}")

@@ -48,7 +48,7 @@ def fetch_latest_live_candles(count=200) -> pd.DataFrame:
         df.index = df.index.tz_convert('UTC')
     return df.tail(count).sort_index()
 
-def prepare_multi_timeframe_data(df_5m: pd.DataFrame, include_dxy=True):
+def prepare_multi_timeframe_data(df_5m: pd.DataFrame, include_dxy=True, is_live=False):
     """
     Transform 5M raw data into:
     - Daily Macro Trend (Pilar 2)
@@ -101,7 +101,11 @@ def prepare_multi_timeframe_data(df_5m: pd.DataFrame, include_dxy=True):
     # 4. DXY Dollar Index Inverse Correlation (Pilar 3)
     if include_dxy:
         try:
-            df_dxy = get_dxy_data(use_cache=True)
+            if is_live:
+                from dxy_feed import get_live_dxy
+                df_dxy = get_live_dxy()
+            else:
+                df_dxy = get_dxy_data(use_cache=True)
             df_15m = df_15m.merge(
                 df_dxy[['Close', 'DXY_Bullish', 'DXY_Bearish']].rename(columns={'Close': 'DXY_Close'}),
                 left_index=True, right_index=True, how='left'
