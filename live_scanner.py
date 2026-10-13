@@ -113,14 +113,20 @@ def test_discord_alert():
     """
     Send an immediate test alert using real-time market price to verify Discord Webhook configuration.
     """
-    print("[TEST] Mengambil harga market real-time XAUUSD...", flush=True)
+    print("[TEST] Mengambil harga market real-time XAUUSD dari TradingView Forex.com...", flush=True)
     try:
-        df_5m = fetch_latest_live_candles(count=20)
-        current_price = round(float(df_5m['Close'].iloc[-1]), 2)
-        print(f"[TEST] Harga real-time market saat ini terdeteksi: ${current_price:.2f}", flush=True)
+        from data_feed import get_tradingview_forexcom_quote
+        tv_quote = get_tradingview_forexcom_quote()
+        if tv_quote:
+            current_price = round(tv_quote['close'], 2)
+            print(f"[TEST] Harga real-time TradingView FOREXCOM:XAUUSD terdeteksi: ${current_price:.2f}", flush=True)
+        else:
+            df_5m = fetch_latest_live_candles(count=20)
+            current_price = round(float(df_5m['Close'].iloc[-1]), 2)
+            print(f"[TEST] Harga real-time market saat ini terdeteksi: ${current_price:.2f}", flush=True)
     except Exception as e:
         print(f"[WARN] Gagal mengambil candle real-time ({e}), menggunakan fallback.", flush=True)
-        current_price = 4212.00
+        current_price = 4185.00
 
     sl_dist = config.SL_PIPS / 10.0
     tp1_dist = config.TP1_PIPS / 10.0

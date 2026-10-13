@@ -10,7 +10,41 @@ from datetime import datetime, timezone
 import config
 from dxy_feed import get_dxy_data
 
+import requests
+
 CACHE_FILE = "xauusd_5m_cache.csv"
+
+def get_tradingview_forexcom_quote():
+    """
+    Fetch exact real-time quote for FOREXCOM:XAUUSD directly from TradingView CFD Scanner.
+    """
+    url = 'https://scanner.tradingview.com/cfd/scan'
+    payload = {
+        'symbols': {'tickers': [getattr(config, 'TRADINGVIEW_SYMBOL', 'FOREXCOM:XAUUSD')]},
+        'columns': ['close', 'open', 'high', 'low', 'bid', 'ask']
+    }
+    try:
+        resp = requests.post(
+            url,
+            json=payload,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'},
+            timeout=5
+        )
+        if resp.status_code == 200:
+            data = resp.json().get('data', [])
+            if data:
+                d = data[0]['d']
+                return {
+                    'close': float(d[0]),
+                    'open': float(d[1]),
+                    'high': float(d[2]),
+                    'low': float(d[3]),
+                    'bid': float(d[4]) if d[4] is not None else float(d[0]),
+                    'ask': float(d[5]) if d[5] is not None else float(d[0])
+                }
+    except Exception as e:
+        print(f"[WARN] Gagal mengambil quote TradingView ({e})", flush=True)
+    return None
 
 def fetch_gold_data(period="60d", interval="5m", use_cache=True) -> pd.DataFrame:
     """
@@ -36,7 +70,8 @@ def fetch_gold_data(period="60d", interval="5m", use_cache=True) -> pd.DataFrame
 
 def fetch_latest_live_candles(count=200) -> pd.DataFrame:
     """
-    Fetch the most recent live candles for scanner execution.
+    Fetch the most recent live candles for scanner execution,
+    synchronized with TradingView Forex.com real-time market price.
     """
     df = yf.download(config.SYMBOL, period="5d", interval="5m", progress=False)
     if isinstance(df.columns, pd.MultiIndex):
@@ -46,7 +81,21 @@ def fetch_latest_live_candles(count=200) -> pd.DataFrame:
         df.index = df.index.tz_localize('UTC')
     else:
         df.index = df.index.tz_convert('UTC')
-    return df.tail(count).sort_index()
+
+    df = df.tail(count).sort_index().copy()
+
+    # Synchronize latest candle with TradingView FOREXCOM:XAUUSD
+    tv_quote = get_tradingview_forexcom_quote()
+    if tv_quote and not df.empty:
+        latest_idx = df.index[-1]
+        tv_close = tv_quote['close']
+        df.loc[latest_idx, 'Close'] = tv_close
+        if tv_close > df.loc[latest_idx, 'High']:
+            df.loc[latest_idx, 'High'] = tv_close
+        if tv_close < df.loc[latest_idx, 'Low']:
+            df.loc[latest_idx, 'Low'] = tv_close
+
+    return df
 
 def prepare_multi_timeframe_data(df_5m: pd.DataFrame, include_dxy=True, is_live=False):
     """

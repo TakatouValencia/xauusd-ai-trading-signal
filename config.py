@@ -16,8 +16,9 @@ DISCORD_PING_MENTION = os.getenv("DISCORD_PING_MENTION", "@everyone").strip()
 # 2. INSTRUMENT & BOT IDENTITY
 # ==============================================================================
 BOT_NAME = "Novaire EA V2"
-SYMBOL = "GC=F"           # Gold Futures (CME Comex Gold)
-DISPLAY_SYMBOL = "XAUUSD" # Tampilan simbol di Discord
+SYMBOL = "PAXG-USD"                      # Physical Spot Gold Base (London Good Delivery)
+TRADINGVIEW_SYMBOL = "FOREXCOM:XAUUSD"  # Live Real-Time Feed dari TradingView Forex.com
+DISPLAY_SYMBOL = "XAUUSD"                # Tampilan simbol di Discord
 
 # ==============================================================================
 # 3. TRADING SESSION HOURS (ZONA WAKTU UTC & WIB)
