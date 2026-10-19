@@ -53,23 +53,42 @@ NY_END_MINUTE_UTC = 30
 # ==============================================================================
 # 4. ORDER PARAMETERS & TARGET PIPS (1 pip = $0.10 pada Gold)
 # ==============================================================================
-SL_PIPS = 60.0                  # Stop Loss Default: 60 pips ($6.00 move)
-TP1_PIPS = 100.0                # Take Profit 1: 100 pips ($10.00 move) - Lock BE + Partials
-TP2_PIPS = 150.0                # Take Profit 2: 150 pips ($15.00 move) - Full TP
+# Menyesuaikan volatilitas Gold terkini ($4,180): ATR M15 rata-rata adalah ~70 pips.
+# SL 75 pips melindungi posisi dari wick noise tanpa terkena stop-out prematur.
+SL_PIPS = float(os.getenv("SL_PIPS", "75.0"))                  # Stop Loss Default: 75 pips ($7.50 move)
+TP1_PIPS = float(os.getenv("TP1_PIPS", "100.0"))               # Take Profit 1: 100 pips ($10.00 move) - Lock BE + Partials
+TP2_PIPS = float(os.getenv("TP2_PIPS", "160.0"))               # Take Profit 2: 160 pips ($16.00 move) - Full TP
 
-BREAKEVEN_TRIGGER_PIPS = 50.0   # Saat running +50 pips, pindahkan SL ke BE + buffer
+BREAKEVEN_TRIGGER_PIPS = float(os.getenv("BREAKEVEN_TRIGGER_PIPS", "70.0"))   # Pindahkan SL ke BE setelah running +70 pips (mencegah exit prematur pada retest wajar)
 BREAKEVEN_BUFFER_PIPS = 5.0     # Buffer pengaman di atas entry (+5 pips)
 TRAILING_TP1_LOCK_PIPS = 60.0   # Saat TP1 kena, kunci profit minimal +60 pips untuk runner
 
 # ==============================================================================
-# 5. AI CONFLUENCE & QUALITY FILTERS
+# 5. ORDER EXECUTION MODE (MARKET vs LIMIT)
+# ==============================================================================
+# 'MARKET': Eksekusi instan langsung saat candle M15 close terkonfirmasi (Disarankan untuk Gold)
+# 'LIMIT' : Pasang pending order Buy Limit / Sell Limit dengan retest pullback wajar
+ENTRY_MODE = os.getenv("ENTRY_MODE", "MARKET").strip().upper()
+LIMIT_PULLBACK_PIPS = float(os.getenv("LIMIT_PULLBACK_PIPS", "5.0"))  # Pullback discount pips untuk mode LIMIT (default 5 pips = $0.50)
+LIMIT_MAX_WAIT_BARS = int(os.getenv("LIMIT_MAX_WAIT_BARS", "4"))      # Maksimal menunggu 4 bar M15 (1 jam) sebelum limit dibatalkan jika tidak kena
+
+# ==============================================================================
+# 6. AI CONFLUENCE & QUALITY FILTERS
 # ==============================================================================
 MIN_CONFLUENCE_SCORE = 80       # Ambang batas skor setup A+ (0 - 100)
 MAX_TRADES_PER_SESSION = 1      # Batasi maksimal 1 sinyal sniper per sesi (Cegah overtrading)
 REQUIRE_HTF_ALIGNMENT = True    # Wajib searah dengan tren makro 1-Jam (EMA 50 & 200)
-WAIT_PULLBACK_ENTRY = True      # Tunggu retest / discount 3-5 pips daripada market high/low
 
 # ==============================================================================
-# 6. SCANNER POLLING
+# 7. RISK MANAGEMENT & DAILY CIRCUIT BREAKER
 # ==============================================================================
-POLL_INTERVAL_SECONDS = 60       # Interval pemantauan chart (dalam detik)
+ENABLE_CIRCUIT_BREAKER = os.getenv("ENABLE_CIRCUIT_BREAKER", "true").lower() in ("true", "1", "yes")
+MAX_CONSECUTIVE_LOSSES_PER_DAY = int(os.getenv("MAX_CONSECUTIVE_LOSSES_PER_DAY", "3"))  # Berhenti trade hari itu jika 3x loss beruntun, lanjut besok
+
+# ==============================================================================
+# 8. SCANNER & TICK POLLING
+# ==============================================================================
+POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "15"))       # Interval pemantauan chart M15 (dalam detik)
+ACTIVE_TRADE_POLL_SECONDS = int(os.getenv("ACTIVE_TRADE_POLL_SECONDS", "5")) # Pemantauan tick real-time saat posisi aktif (SL/TP/BE instan)
+
+

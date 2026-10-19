@@ -36,17 +36,29 @@ def send_discord_webhook(payload: dict) -> bool:
 def notify_signal_entry(signal) -> bool:
     """
     Format and send a new ENTRY Signal with 5-Pillar verification to Discord.
+    Supports both MARKET (Instant Entry) and LIMIT (Retest) modes.
     """
     is_buy = signal.direction == 'BUY'
+    order_type = getattr(signal, 'order_type', f"{signal.direction} MARKET")
+    is_limit = "LIMIT" in order_type
+
     color = 58998 if is_buy else 16717636  # Green for BUY, Red for SELL
     icon = "🟢" if is_buy else "🔴"
-    action_text = "BUY LIMIT / RETEST" if is_buy else "SELL LIMIT / RETEST"
+
+    if is_limit:
+        action_text = f"{signal.direction} LIMIT / RETEST"
+        entry_label = "Limit Entry"
+        status_note = f"⏳ **Status:** Pasang **Pending Order {action_text}** di `{signal.entry_price:.2f}` (Tunggu retest dari `{signal.market_price:.2f}`)."
+    else:
+        action_text = f"{signal.direction} NOW (MARKET EXECUTION)"
+        entry_label = "Market Entry"
+        status_note = f"⚡ **Status:** **Eksekusi Instan (Market Order)** di `{signal.entry_price:.2f}` pada penutupan M15."
 
     reasons_formatted = "\n".join([f"• {r}" for r in signal.reasons])
 
     embed = {
         "title": f"{icon} {config.BOT_NAME} | {action_text}",
-        "description": f"**{config.BOT_NAME} 5-Pillar Engine** memvalidasi setup akurasi tinggi di **{signal.session}**.",
+        "description": f"**{config.BOT_NAME} 5-Pillar Engine** memvalidasi setup akurasi tinggi di **{signal.session}**.\n{status_note}",
         "color": color,
         "fields": [
             {
@@ -56,7 +68,7 @@ def notify_signal_entry(signal) -> bool:
             },
             {
                 "name": "🎯 Order Parameters",
-                "value": f"**Limit Entry:** `{signal.entry_price:.2f}`\n**SL:** `{signal.sl_price:.2f}` (`-{signal.sl_pips} pips`)\n**TP1:** `{signal.tp1_price:.2f}` (`+{signal.tp1_pips} pips`)\n**TP2:** `{signal.tp2_price:.2f}` (`+{signal.tp2_pips} pips`)",
+                "value": f"**{entry_label}:** `{signal.entry_price:.2f}`\n**SL:** `{signal.sl_price:.2f}` (`-{signal.sl_pips} pips`)\n**TP1:** `{signal.tp1_price:.2f}` (`+{signal.tp1_pips} pips`)\n**TP2:** `{signal.tp2_price:.2f}` (`+{signal.tp2_pips} pips`)",
                 "inline": True
             },
             {
@@ -92,9 +104,17 @@ def notify_signal_entry(signal) -> bool:
 
 def notify_trade_update(update_type: str, trade_info: dict) -> bool:
     """
-    Notify updates such as Breakeven Moved, TP1 Hit, TP2 Hit, or SL Hit.
+    Notify updates such as Limit Order Filled, Limit Expired, Breakeven Moved, TP1 Hit, TP2 Hit, or SL Hit.
     """
-    if update_type == "BREAKEVEN":
+    if update_type == "ORDER_FILLED":
+        color = 3066993  # Teal
+        title = f"🎯 {config.BOT_NAME}: PENDING LIMIT ORDER FILLED"
+        desc = f"Pending **{trade_info['direction']} LIMIT** di `{trade_info['entry_price']:.2f}` berhasil terjemput! Posisi trading kini **AKTIF**."
+    elif update_type == "ORDER_EXPIRED":
+        color = 9807270  # Grey
+        title = f"⏱️ {config.BOT_NAME}: PENDING LIMIT CANCELLED (EXPIRED)"
+        desc = f"Pending order **{trade_info['direction']} LIMIT** di `{trade_info['entry_price']:.2f}` dibatalkan karena tidak terjemput dalam batas waktu ({config.LIMIT_MAX_WAIT_BARS} bar M15)."
+    elif update_type == "BREAKEVEN":
         color = 2718207 # Blue
         title = f"🛡️ {config.BOT_NAME}: STOP LOSS MOVED TO BREAKEVEN"
         desc = f"**{trade_info['direction']} {config.DISPLAY_SYMBOL}** sudah running **+{config.BREAKEVEN_TRIGGER_PIPS} pips**! Stop Loss telah diamankan ke Entry (Risk-Free Trade)."
@@ -110,6 +130,16 @@ def notify_trade_update(update_type: str, trade_info: dict) -> bool:
         color = 12000284 # Dark Red
         title = f"🛑 {config.BOT_NAME}: STOP LOSS HIT"
         desc = f"Trade **{trade_info['direction']} {config.DISPLAY_SYMBOL}** terkena Stop Loss di `{trade_info['sl']:.2f}` (`-{trade_info['sl_pips']} pips`). Disiplin risiko terjaga."
+    elif update_type == "CIRCUIT_BREAKER":
+        color = 16711680 # Bright Red
+        losses = trade_info.get('consecutive_losses', config.MAX_CONSECUTIVE_LOSSES_PER_DAY)
+        date_str = trade_info.get('date', datetime.utcnow().strftime('%Y-%m-%d'))
+        title = f"🛑 {config.BOT_NAME}: DAILY CIRCUIT BREAKER ACTIVATED"
+        desc = (
+            f"⚠️ **Proteksi Modal Aktif!** Terdeteksi **{losses}x Loss Beruntun** pada hari ini ({date_str}).\n\n"
+            f"Demi mengamankan modal dan menjaga psikologi trading, sistem **OTOMATIS BERHENTI TRADING HARI INI**.\n\n"
+            f"🔄 Bot akan aktif kembali secara otomatis besok pada sesi berikutnya."
+        )
     else:
         color = 9807270
         title = f"ℹ️ {config.BOT_NAME}: {update_type}"

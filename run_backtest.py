@@ -21,8 +21,12 @@ def execute_backtest(df_15m: pd.DataFrame,
                      tp1_pips=config.TP1_PIPS, 
                      tp2_pips=config.TP2_PIPS,
                      be_trigger=config.BREAKEVEN_TRIGGER_PIPS,
-                     min_score=config.MIN_CONFLUENCE_SCORE):
+                     min_score=config.MIN_CONFLUENCE_SCORE,
+                     entry_mode=None):
     
+    if entry_mode is None:
+        entry_mode = getattr(config, 'ENTRY_MODE', 'MARKET').upper()
+
     opens = df_15m['Open'].values
     highs = df_15m['High'].values
     lows = df_15m['Low'].values
@@ -34,8 +38,13 @@ def execute_backtest(df_15m: pd.DataFrame,
 
     trades = []
     in_trade = False
+    pending_order = None
     current_trade = None
     last_trade_session = None
+
+    curr_day = None
+    consecutive_losses_today = 0
+    circuit_breaker_active = False
 
     for i in range(25, n):
         t = timestamps[i]
@@ -45,6 +54,12 @@ def execute_backtest(df_15m: pd.DataFrame,
         c_high = highs[i]
         c_low = lows[i]
         c_close = closes[i]
+
+        # Reset daily circuit breaker on new date
+        if d != curr_day:
+            curr_day = d
+            consecutive_losses_today = 0
+            circuit_breaker_active = False
 
         curr_session_id = f"{d}_{'LDN' if (config.LONDON_START_HOUR_UTC <= h <= config.LONDON_END_HOUR_UTC) else 'NY'}"
 
@@ -63,10 +78,15 @@ def execute_backtest(df_15m: pd.DataFrame,
                     current_trade['pnl_pips'] = pnl
                     if pnl > 0:
                         current_trade['result'] = 'PROFIT_TRAIL'
+                        consecutive_losses_today = 0
                     elif pnl == 0:
                         current_trade['result'] = 'BREAKEVEN'
+                        consecutive_losses_today = 0
                     else:
                         current_trade['result'] = 'LOSS'
+                        consecutive_losses_today += 1
+                        if config.ENABLE_CIRCUIT_BREAKER and consecutive_losses_today >= config.MAX_CONSECUTIVE_LOSSES_PER_DAY:
+                            circuit_breaker_active = True
                     trades.append(current_trade)
                     in_trade = False
                     current_trade = None
@@ -81,6 +101,7 @@ def execute_backtest(df_15m: pd.DataFrame,
                 if not current_trade['tp1_hit'] and c_high >= (entry_p + (tp1_pips / 10.0)):
                     current_trade['tp1_hit'] = True
                     current_trade['sl'] = entry_p + 6.0
+                    consecutive_losses_today = 0
 
                 # Stage 3: Hit TP2 (+150 pips) -> Full Victory Exit
                 if c_high >= (entry_p + (tp2_pips / 10.0)):
@@ -88,6 +109,7 @@ def execute_backtest(df_15m: pd.DataFrame,
                     current_trade['exit_price'] = entry_p + (tp2_pips / 10.0)
                     current_trade['pnl_pips'] = tp2_pips
                     current_trade['result'] = 'FULL_TP2'
+                    consecutive_losses_today = 0
                     trades.append(current_trade)
                     in_trade = False
                     current_trade = None
@@ -101,10 +123,15 @@ def execute_backtest(df_15m: pd.DataFrame,
                     current_trade['pnl_pips'] = pnl
                     if pnl > 0:
                         current_trade['result'] = 'PROFIT_TRAIL'
+                        consecutive_losses_today = 0
                     elif pnl == 0:
                         current_trade['result'] = 'BREAKEVEN'
+                        consecutive_losses_today = 0
                     else:
                         current_trade['result'] = 'LOSS'
+                        consecutive_losses_today += 1
+                        if config.ENABLE_CIRCUIT_BREAKER and consecutive_losses_today >= config.MAX_CONSECUTIVE_LOSSES_PER_DAY:
+                            circuit_breaker_active = True
                     trades.append(current_trade)
                     in_trade = False
                     current_trade = None
@@ -117,12 +144,14 @@ def execute_backtest(df_15m: pd.DataFrame,
                 if not current_trade['tp1_hit'] and c_low <= (entry_p - (tp1_pips / 10.0)):
                     current_trade['tp1_hit'] = True
                     current_trade['sl'] = entry_p - 6.0
+                    consecutive_losses_today = 0
 
                 if c_low <= (entry_p - (tp2_pips / 10.0)):
                     current_trade['exit_time'] = str(t)
                     current_trade['exit_price'] = entry_p - (tp2_pips / 10.0)
                     current_trade['pnl_pips'] = tp2_pips
                     current_trade['result'] = 'FULL_TP2'
+                    consecutive_losses_today = 0
                     trades.append(current_trade)
                     in_trade = False
                     current_trade = None
@@ -136,26 +165,88 @@ def execute_backtest(df_15m: pd.DataFrame,
                 current_trade['exit_price'] = exit_p
                 current_trade['pnl_pips'] = pnl
                 current_trade['result'] = 'TIMEOUT_WIN' if pnl > 0 else 'TIMEOUT_LOSS'
+                if pnl > 0:
+                    consecutive_losses_today = 0
+                else:
+                    consecutive_losses_today += 1
+                    if config.ENABLE_CIRCUIT_BREAKER and consecutive_losses_today >= config.MAX_CONSECUTIVE_LOSSES_PER_DAY:
+                        circuit_breaker_active = True
                 trades.append(current_trade)
                 in_trade = False
                 current_trade = None
                 continue
 
-        # 2. Check Candidate Signal Entry
-        if not in_trade:
+        # 2. Check Pending Limit Order Fill
+        if pending_order is not None and not in_trade:
+            # Check expiry
+            if (i - pending_order['placed_bar']) > config.LIMIT_MAX_WAIT_BARS:
+                pending_order = None # Expired without fill
+            else:
+                p_dir = pending_order['direction']
+                p_entry = pending_order['entry_price']
+                filled = False
+
+                if p_dir == 'BUY' and c_low <= p_entry:
+                    filled = True
+                elif p_dir == 'SELL' and c_high >= p_entry:
+                    filled = True
+
+                if filled:
+                    in_trade = True
+                    current_trade = pending_order
+                    current_trade['entry_bar'] = i
+                    current_trade['fill_time'] = str(t)
+                    pending_order = None
+
+                    # Check if SL hit on the same fill candle
+                    if p_dir == 'BUY' and c_low <= current_trade['sl']:
+                        pnl = round((current_trade['sl'] - p_entry) * 10.0, 1)
+                        current_trade['exit_time'] = str(t)
+                        current_trade['exit_price'] = current_trade['sl']
+                        current_trade['pnl_pips'] = pnl
+                        current_trade['result'] = 'LOSS'
+                        consecutive_losses_today += 1
+                        if config.ENABLE_CIRCUIT_BREAKER and consecutive_losses_today >= config.MAX_CONSECUTIVE_LOSSES_PER_DAY:
+                            circuit_breaker_active = True
+                        trades.append(current_trade)
+                        in_trade = False
+                        current_trade = None
+                        continue
+                    elif p_dir == 'SELL' and c_high >= current_trade['sl']:
+                        pnl = round((p_entry - current_trade['sl']) * 10.0, 1)
+                        current_trade['exit_time'] = str(t)
+                        current_trade['exit_price'] = current_trade['sl']
+                        current_trade['pnl_pips'] = pnl
+                        current_trade['result'] = 'LOSS'
+                        consecutive_losses_today += 1
+                        if config.ENABLE_CIRCUIT_BREAKER and consecutive_losses_today >= config.MAX_CONSECUTIVE_LOSSES_PER_DAY:
+                            circuit_breaker_active = True
+                        trades.append(current_trade)
+                        in_trade = False
+                        current_trade = None
+                        continue
+
+        # 3. Check Candidate Signal Entry
+        if not in_trade and pending_order is None:
+            # Check Daily Circuit Breaker
+            if circuit_breaker_active:
+                continue
+
             # Check 1 trade per session limit
             if config.MAX_TRADES_PER_SESSION == 1 and last_trade_session == curr_session_id:
                 continue
 
-            sig = analyze_candle_for_signal(df_15m, idx=i)
+            sig = analyze_candle_for_signal(df_15m, idx=i, entry_mode=entry_mode)
             if sig is not None and sig.score >= min_score:
-                in_trade = True
                 last_trade_session = curr_session_id
-                current_trade = {
-                    'entry_bar': i,
+                order_item = {
+                    'placed_bar': i,
+                    'entry_bar': i if entry_mode == 'MARKET' else None,
                     'entry_time': str(sig.timestamp),
                     'direction': sig.direction,
+                    'order_type': sig.order_type,
                     'entry_price': sig.entry_price,
+                    'market_price': sig.market_price,
                     'sl': sig.sl_price,
                     'sl_pips': sig.sl_pips,
                     'tp1': sig.tp1_price,
@@ -169,6 +260,12 @@ def execute_backtest(df_15m: pd.DataFrame,
                     'zone_type': getattr(sig, 'zone_type', 'Fresh Institutional Area'),
                     'reasons': " | ".join(sig.reasons)
                 }
+
+                if entry_mode == 'LIMIT':
+                    pending_order = order_item
+                else:
+                    in_trade = True
+                    current_trade = order_item
 
     df_trades = pd.DataFrame(trades)
     return df_trades
@@ -213,6 +310,7 @@ def print_backtest_report(df_trades: pd.DataFrame):
     print(f"⚖️ Profit Factor           : {profit_factor:.2f}")
     print(f"📈 Rata-Rata Profit/Trade  : {avg_pips:+.2f} pips")
     print(f"📉 Maximum Drawdown        : -{max_dd_pips:.1f} pips (< 4.5% equity risk)")
+    print(f"🛡️ Daily Circuit Breaker   : {'Aktif (Max ' + str(config.MAX_CONSECUTIVE_LOSSES_PER_DAY) + 'x Loss/Hari)' if config.ENABLE_CIRCUIT_BREAKER else 'Nonaktif'}")
     print("-" * 80)
 
     # Breakdown by Direction

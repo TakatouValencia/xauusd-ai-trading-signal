@@ -14,9 +14,12 @@ from news_filter import is_news_blackout
 
 class Signal:
     def __init__(self, timestamp, direction, entry_price, sl_price, tp1_price, tp2_price, 
-                 score, session, reasons, fvg_level=None, zone_type=None, zone_range=None):
+                 score, session, reasons, fvg_level=None, zone_type=None, zone_range=None,
+                 order_type=None, market_price=None):
         self.timestamp = timestamp
         self.direction = direction        # 'BUY' or 'SELL'
+        self.order_type = order_type or (f"{direction} MARKET" if getattr(config, 'ENTRY_MODE', 'MARKET') == 'MARKET' else f"{direction} LIMIT")
+        self.market_price = float(market_price) if market_price is not None else float(entry_price)
         self.entry_price = float(entry_price)
         self.sl_price = float(sl_price)
         self.tp1_price = float(tp1_price)
@@ -38,6 +41,8 @@ class Signal:
             'timestamp': str(self.timestamp),
             'symbol': config.DISPLAY_SYMBOL,
             'direction': self.direction,
+            'order_type': self.order_type,
+            'market_price': self.market_price,
             'entry_price': self.entry_price,
             'sl_price': self.sl_price,
             'tp1_price': self.tp1_price,
@@ -218,7 +223,7 @@ def check_trading_session(hour: int, minute: int):
 
     return False, "Di Luar Jam Sesi Trading"
 
-def analyze_candle_for_signal(df_15m: pd.DataFrame, idx=-1) -> Signal:
+def analyze_candle_for_signal(df_15m: pd.DataFrame, idx=-1, entry_mode=None) -> Signal:
     """
     Execute 5-Pillar Decision Matrix:
     1. Check News Blackout
@@ -419,14 +424,26 @@ def analyze_candle_for_signal(df_15m: pd.DataFrame, idx=-1) -> Signal:
 
     threshold = 85
 
-    # PILAR 4: Entry Optimization via Fresh Institutional Zone (OB / FVG / SNR)
+    if entry_mode is None:
+        entry_mode = getattr(config, 'ENTRY_MODE', 'MARKET').upper()
+
+    # PILAR 4: Entry Optimization (MARKET vs LIMIT) & Invalidation Anchor SL
     if norm_buy_score >= threshold and norm_buy_score > norm_sell_score:
         buy_zone = detect_fresh_institutional_zone(df_15m, idx, 'BUY')
-        entry_price = buy_zone['entry']
+        market_price = round(c_close, 2)
+
+        if entry_mode == 'LIMIT':
+            pullback_dist = getattr(config, 'LIMIT_PULLBACK_PIPS', 5.0) / 10.0
+            entry_price = round(market_price - pullback_dist, 2)
+            order_type = 'BUY LIMIT'
+        else:
+            entry_price = market_price
+            order_type = 'BUY MARKET'
         
-        # SL diletakkan 5 pips di bawah anchor invalidation zone
-        raw_sl_dist = (entry_price - buy_zone['sl_anchor']) * 10.0 + 5.0
-        actual_sl_pips = max(40.0, min(65.0, raw_sl_dist))
+        # SL diletakkan dengan buffer pengaman di bawah anchor invalidation zone
+        min_sl = getattr(config, 'SL_PIPS', 75.0)
+        raw_sl_dist = (entry_price - buy_zone['sl_anchor']) * 10.0 + 8.0
+        actual_sl_pips = max(min_sl, min(100.0, raw_sl_dist))
         
         sl_price = round(entry_price - (actual_sl_pips / 10.0), 2)
         tp1_price = round(entry_price + (config.TP1_PIPS / 10.0), 2)
@@ -444,15 +461,26 @@ def analyze_candle_for_signal(df_15m: pd.DataFrame, idx=-1) -> Signal:
             reasons=buy_reasons,
             fvg_level=entry_price,
             zone_type=buy_zone['type'],
-            zone_range=f"[{buy_zone['zone_bot']:.2f} - {buy_zone['zone_top']:.2f}]"
+            zone_range=f"[{buy_zone['zone_bot']:.2f} - {buy_zone['zone_top']:.2f}]",
+            order_type=order_type,
+            market_price=market_price
         )
 
     elif norm_sell_score >= threshold and norm_sell_score > norm_buy_score:
         sell_zone = detect_fresh_institutional_zone(df_15m, idx, 'SELL')
-        entry_price = sell_zone['entry']
+        market_price = round(c_close, 2)
 
-        raw_sl_dist = (sell_zone['sl_anchor'] - entry_price) * 10.0 + 5.0
-        actual_sl_pips = max(40.0, min(65.0, raw_sl_dist))
+        if entry_mode == 'LIMIT':
+            pullback_dist = getattr(config, 'LIMIT_PULLBACK_PIPS', 5.0) / 10.0
+            entry_price = round(market_price + pullback_dist, 2)
+            order_type = 'SELL LIMIT'
+        else:
+            entry_price = market_price
+            order_type = 'SELL MARKET'
+
+        min_sl = getattr(config, 'SL_PIPS', 75.0)
+        raw_sl_dist = (sell_zone['sl_anchor'] - entry_price) * 10.0 + 8.0
+        actual_sl_pips = max(min_sl, min(100.0, raw_sl_dist))
 
         sl_price = round(entry_price + (actual_sl_pips / 10.0), 2)
         tp1_price = round(entry_price - (config.TP1_PIPS / 10.0), 2)
@@ -470,9 +498,9 @@ def analyze_candle_for_signal(df_15m: pd.DataFrame, idx=-1) -> Signal:
             reasons=sell_reasons,
             fvg_level=entry_price,
             zone_type=sell_zone['type'],
-            zone_range=f"[{sell_zone['zone_bot']:.2f} - {sell_zone['zone_top']:.2f}]"
+            zone_range=f"[{sell_zone['zone_bot']:.2f} - {sell_zone['zone_top']:.2f}]",
+            order_type=order_type,
+            market_price=market_price
         )
-
-    return None
 
     return None
